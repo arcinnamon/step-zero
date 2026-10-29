@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://step-zero.local/schemas/common.schema.json",
+  "title": "Shared definitions",
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$" },
+    "revisionId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]-r[1-9][0-9]*$" },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "repoPath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._][A-Za-z0-9._/*-]*$",
+      "not": { "pattern": "(^|/)\\.\\.(/|$)" }
+    },
+    "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+    "requirementId": { "type": "string", "pattern": "^REQ-[0-9]{3,}$" },
+    "adrId": { "type": "string", "pattern": "^ADR-[0-9]{4,}$" },
+    "nonEmptyString": { "type": "string", "minLength": 1 }
+  }
+}

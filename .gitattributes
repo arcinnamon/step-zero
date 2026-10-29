@@ -1,0 +1,3 @@
+# Revision snapshots are content-hashed byte for byte; never normalize line endings.
+architecture/revisions/** -text
+scripts/tests/fixtures/** -text

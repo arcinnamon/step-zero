@@ -1,0 +1,19 @@
+{
+  "comment": "Initial minimum from docs/governance.md. The authoritative copy must be loaded from the trusted base branch, never from the PR under evaluation (G5).",
+  "protected": [
+    "architecture/**",
+    "delivery/plan.yaml",
+    "delivery/schemas/**",
+    ".github/agents/**",
+    ".github/prompts/**",
+    ".github/workflows/**",
+    ".github/CODEOWNERS",
+    ".github/copilot-instructions.md",
+    "scripts/**",
+    "docs/governance.md",
+    "AGENTS.md",
+    "vercel.json",
+    ".vercel/**",
+    ".env*"
+  ]
+}

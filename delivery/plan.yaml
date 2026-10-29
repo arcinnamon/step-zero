@@ -1,0 +1,5 @@
+# Empty plan: no architecture revision has been approved yet.
+# Delivery tasks are materialized here only from an approved, digest-bound revision snapshot.
+schema_version: 1
+architecture: null
+tasks: []

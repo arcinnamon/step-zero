@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "architecture_id": "demo-notes",
+  "revision": 1,
+  "revision_id": "demo-notes-r1",
+  "supersedes": null,
+  "status": "awaiting-human",
+  "content_digest": "sha256:db4bd4387e34a51d7df2976b90c9825f9bf14a0fb73070758745c9d1cb2814f3",
+  "files": [
+    {
+      "path": "decisions/ADR-0001.md",
+      "sha256": "2b8200d3f87c2f7503eb9e2cd128c07a7a778f1f1f530792089eb3cc664feb73"
+    },
+    {
+      "path": "design.md",
+      "sha256": "3031d30188a187aa25e59fa0808b7457ecc7b1c85f84ec0249c332fcf90c8388"
+    },
+    {
+      "path": "plan.yaml",
+      "sha256": "b2ceab4f04b3356cf6072b539b491520d48899ba7ff0f0e7332439158736d0a7"
+    },
+    {
+      "path": "requirements.md",
+      "sha256": "4921fe1fedd23592156736dcac3ed46f168b9460b358281488adcf4e81dba1f6"
+    },
+    {
+      "path": "reviews/review-1.md",
+      "sha256": "039872cecbae76d238f44b05ca458e04c110cb5f439f1c3c82e5a30f69299012"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Add a note",
+      "kind": "functional",
+      "acceptance_criteria": [
+        "POST /api/notes stores a note and returns 201."
+      ]
+    },
+    {
+      "id": "REQ-002",
+      "title": "Responsive writes",
+      "kind": "nonfunctional",
+      "acceptance_criteria": [
+        "p95 add latency under 500 ms."
+      ]
+    }
+  ],
+  "adrs": [
+    {
+      "id": "ADR-0001",
+      "title": "Persist notes through a single API route",
+      "path": "decisions/ADR-0001.md"
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "notes-api",
+      "name": "POST /api/notes",
+      "description": "Creates a note from a JSON body."
+    }
+  ],
+  "risks": [
+    {
+      "id": "unbounded-input",
+      "description": "Large payloads exhaust storage.",
+      "severity": "medium",
+      "mitigation": "Cap note size."
+    }
+  ],
+  "reviewer_findings": [
+    {
+      "id": "f-001",
+      "severity": "medium",
+      "title": "No input length limit",
+      "evidence": "design.md describes no validation.",
+      "remediation": "Cap note size in the handler.",
+      "disposition": "resolved",
+      "disposition_note": "Size cap added to add-note-api acceptance criteria.",
+      "disposition_by": "example-maintainer"
+    }
+  ],
+  "task_dependencies": [
+    {
+      "task_id": "add-note-api",
+      "depends_on": []
+    },
+    {
+      "task_id": "add-notes-list",
+      "depends_on": [
+        "add-note-api"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://step-zero.local/schemas/plan.schema.json",
+  "title": "Delivery plan (task DAG)",
+  "description": "Snapshot copies inside an architecture revision must have architecture.content_digest = null (a digest cannot cover itself). The active delivery/plan.yaml must carry the digest of the approved revision, verified against the revision manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "architecture", "tasks"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "architecture": {
+      "oneOf": [
+        { "type": "null", "description": "No active architecture; the task list must be empty." },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["architecture_id", "revision_id", "content_digest"],
+          "properties": {
+            "architecture_id": { "$ref": "common.schema.json#/$defs/id" },
+            "revision_id": { "$ref": "common.schema.json#/$defs/revisionId" },
+            "content_digest": {
+              "oneOf": [{ "$ref": "common.schema.json#/$defs/digest" }, { "type": "null" }]
+            }
+          }
+        }
+      ]
+    },
+    "tasks": { "type": "array", "items": { "$ref": "task.schema.json" } }
+  }
+}

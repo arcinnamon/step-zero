@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://step-zero.local/schemas/architecture-revision.schema.json",
+  "title": "Architecture revision manifest",
+  "description": "Describes an immutable architecture snapshot. It deliberately has NO approval fields: approval is derived from GitHub review/merge provenance by a trusted check and can never be asserted here (G1, G3).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "architecture_id", "revision", "revision_id", "supersedes", "status",
+    "content_digest", "files", "requirements", "adrs", "interfaces", "risks",
+    "reviewer_findings", "task_dependencies"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "architecture_id": { "$ref": "common.schema.json#/$defs/id" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "revision_id": { "$ref": "common.schema.json#/$defs/revisionId" },
+    "supersedes": {
+      "description": "Revision this one replaces, or null for the first revision. Supersession is explicit and never implied by numbering.",
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/revisionId" }, { "type": "null" }]
+    },
+    "status": {
+      "description": "Informational only. Never consulted for authorization.",
+      "enum": ["draft", "review", "revisions-needed", "approval-ready", "awaiting-human", "rejected", "superseded"]
+    },
+    "content_digest": {
+      "description": "sha256 over sorted 'path<TAB>sha256<LF>' lines of every file in `files` (see scripts/policy/digest.mjs). manifest.json is excluded.",
+      "$ref": "common.schema.json#/$defs/digest"
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "$ref": "common.schema.json#/$defs/repoPath" },
+          "sha256": { "$ref": "common.schema.json#/$defs/sha256" }
+        }
+      }
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "kind", "acceptance_criteria"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/requirementId" },
+          "title": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "kind": { "enum": ["functional", "nonfunctional"] },
+          "acceptance_criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+          }
+        }
+      }
+    },
+    "adrs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "path"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/adrId" },
+          "title": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "path": { "$ref": "common.schema.json#/$defs/repoPath" }
+        }
+      }
+    },
+    "interfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "description"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "name": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "description": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "severity", "mitigation"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "description": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "severity": { "$ref": "common.schema.json#/$defs/severity" },
+          "mitigation": { "$ref": "common.schema.json#/$defs/nonEmptyString" }
+        }
+      }
+    },
+    "reviewer_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "title", "evidence", "remediation", "disposition"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/$defs/id" },
+          "severity": { "$ref": "common.schema.json#/$defs/severity" },
+          "title": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "evidence": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "remediation": { "$ref": "common.schema.json#/$defs/nonEmptyString" },
+          "disposition": {
+            "description": "A blocking (critical/high) finding is only non-open when a documented disposition names who decided and why.",
+            "enum": ["open", "resolved", "accepted-risk"]
+          },
+          "disposition_note": { "type": "string" },
+          "disposition_by": { "type": "string", "description": "GitHub login of the deciding human; recorded for audit, verified by trusted checks, never self-attested." }
+        },
+        "if": { "properties": { "disposition": { "enum": ["resolved", "accepted-risk"] } }, "required": ["disposition"] },
+        "then": {
+          "properties": { "disposition_note": { "type": "string", "minLength": 1 }, "disposition_by": { "type": "string", "minLength": 1 } },
+          "required": ["disposition_note", "disposition_by"]
+        }
+      }
+    },
+    "task_dependencies": {
+      "description": "Task DAG summary; must equal the DAG in the snapshot's plan.yaml.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_id", "depends_on"],
+        "properties": {
+          "task_id": { "$ref": "common.schema.json#/$defs/id" },
+          "depends_on": { "type": "array", "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/id" } }
+        }
+      }
+    }
+  }
+}
