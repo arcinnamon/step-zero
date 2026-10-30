@@ -1,0 +1,1 @@
+-- Seed data for local development (phase 2: `supabase start`).

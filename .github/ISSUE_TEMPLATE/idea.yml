@@ -1,0 +1,23 @@
+name: Idea
+description: Start the pipeline. A few sentences is enough.
+title: "Idea: "
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idea
+      description: What should exist, and who is it for?
+      placeholder: A page where I log which plants I watered, with a reminder when one is overdue.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Optional. Must-haves, must-nots, budget, deadlines.
+  - type: textarea
+    id: done
+    attributes:
+      label: Done looks like
+      description: Optional. How you'll know it works.

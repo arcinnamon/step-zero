@@ -1,0 +1,132 @@
+name: "Stage: staging"
+run-name: "staging #${{ inputs.issue }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue: { description: Issue number, required: true, type: string }
+      feedback_comment_id: { description: Unused, required: false, type: string, default: "" }
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: pipeline-${{ inputs.issue }}
+  cancel-in-progress: false
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  APPROVER: ${{ vars.PIPELINE_APPROVER || github.repository_owner }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  BRANCH: idea/${{ inputs.issue }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: ${{ steps.vercel.outputs.url }}
+    outputs:
+      url: ${{ steps.vercel.outputs.url }}
+      sha: ${{ steps.sha.outputs.sha }}
+      migrations: ${{ steps.db.outputs.result }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BRANCH }}
+          persist-credentials: false
+
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Migrations are SQL files, not code, so nothing agent-written runs here.
+      - name: Migrate staging database
+        id: db
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          if [ -z "${SUPABASE_PROJECT_REF}" ]; then
+            echo "result=skipped (Supabase not set up)" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          supabase db push
+          echo "result=migrations applied to staging" >> "$GITHUB_OUTPUT"
+
+      # Remote build on Vercel: the app is built on Vercel's servers, so
+      # agent-written code never runs next to the Vercel token.
+      - name: Deploy preview
+        id: vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ]; then echo "::error::VERCEL_TOKEN is not set. See README setup."; exit 1; fi
+          url=$(npx --yes vercel@latest deploy --yes --token="$VERCEL_TOKEN" --meta issue="$ISSUE")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      result: ${{ steps.e2e.outcome }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.deploy.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+      - run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - run: npx playwright install --with-deps chromium
+      - name: End-to-end tests against preview
+        id: e2e
+        continue-on-error: true
+        env:
+          BASE_URL: ${{ needs.deploy.outputs.url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: npm run test:e2e
+
+  report:
+    needs: [deploy, e2e]
+    if: ${{ always() && needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        env:
+          URL: ${{ needs.deploy.outputs.url }}
+          SHA: ${{ needs.deploy.outputs.sha }}
+          MIGRATIONS: ${{ needs.deploy.outputs.migrations }}
+          E2E: ${{ needs.e2e.outputs.result || needs.e2e.result }}
+        with:
+          script: |
+            await require('./.github/scripts/pipeline.js').finishStaging({ github, context });
+
+  failed:
+    needs: [deploy]
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./.github/scripts/pipeline.js').failStage({ github, context, stage: 'staging' });

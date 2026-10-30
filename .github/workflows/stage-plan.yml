@@ -1,0 +1,100 @@
+name: "Stage: plan"
+run-name: "plan #${{ inputs.issue }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue: { description: Issue number, required: true, type: string }
+      feedback_comment_id: { description: Comment holding feedback, required: false, type: string, default: "" }
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: pipeline-${{ inputs.issue }}
+  cancel-in-progress: false
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  FEEDBACK_ID: ${{ inputs.feedback_comment_id }}
+  APPROVER: ${{ vars.PIPELINE_APPROVER || github.repository_owner }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  BRANCH: idea/${{ inputs.issue }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Find branch
+        id: branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/branches/${BRANCH}" --silent 2>/dev/null; then
+            echo "ref=${BRANCH}" >> "$GITHUB_OUTPUT"; echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${DEFAULT_BRANCH}" >> "$GITHUB_OUTPUT"; echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.branch.outputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Pipeline scripts and prompts always come from the default branch,
+      # never from the branch agents write to.
+      - name: Load pipeline
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+          path: _pipeline
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Create branch
+        if: steps.branch.outputs.exists != 'true'
+        run: git checkout -b "$BRANCH"
+
+      - name: Prepare context
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./_pipeline/.github/scripts/pipeline.js').prepareContext({ github, context });
+
+      - name: Write plan
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: "*"
+          prompt: |
+            Follow the instructions in _pipeline/.github/prompts/plan.md.
+          claude_args: >-
+            --max-turns 50
+            --allowedTools "Read,Write,Edit,Glob,Grep"
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+
+      - name: Commit and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash _pipeline/.github/scripts/commit.sh "plan: #${ISSUE}"
+
+      - name: Open PR and post prompt
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./_pipeline/.github/scripts/pipeline.js').finishPlan({ github, context });
+
+      - name: Report failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const p = fs.existsSync('./_pipeline/.github/scripts/pipeline.js') ? './_pipeline/.github/scripts/pipeline.js' : './.github/scripts/pipeline.js';
+            await require(p).failStage({ github, context, stage: 'plan' });

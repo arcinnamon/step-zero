@@ -1,0 +1,29 @@
+name: CI
+
+# Runs on your own pushes and PRs. Pipeline commits use GITHUB_TOKEN, which
+# doesn't trigger workflows, so the build stage runs the same checks inline.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+      - run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - run: bash .github/scripts/verify.sh
+      - name: Pipeline logic tests
+        run: node --test .github/scripts/pipeline.test.js

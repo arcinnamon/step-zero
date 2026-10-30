@@ -1,0 +1,24 @@
+name: Pipeline setup
+
+# Run once after creating a repo from the template: creates the labels the
+# pipeline and the Idea issue template use.
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const P = require('./.github/scripts/pipeline.js');
+            await P.client(github, context.repo.owner, context.repo.repo).ensureLabels();
+            core.info('Labels ready.');

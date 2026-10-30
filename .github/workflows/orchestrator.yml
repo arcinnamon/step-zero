@@ -1,0 +1,36 @@
+name: Pipeline orchestrator
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: orchestrator-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  route:
+    # Never react to bots (including this pipeline) or to pull request comments.
+    if: ${{ github.event.sender.type != 'Bot' && !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+      - uses: actions/github-script@v8
+        env:
+          APPROVER: ${{ vars.PIPELINE_APPROVER || github.repository_owner }}
+          MAX_REVIEW_ROUNDS: ${{ vars.MAX_REVIEW_ROUNDS }}
+        with:
+          script: |
+            await require('./.github/scripts/orchestrate.js')({ github, context, core });

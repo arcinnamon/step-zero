@@ -1,0 +1,116 @@
+name: "Stage: build"
+run-name: "build #${{ inputs.issue }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue: { description: Issue number, required: true, type: string }
+      feedback_comment_id: { description: Comment holding feedback, required: false, type: string, default: "" }
+      round: { description: Fix round, required: false, type: string, default: "1" }
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: pipeline-${{ inputs.issue }}
+  cancel-in-progress: false
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  FEEDBACK_ID: ${{ inputs.feedback_comment_id }}
+  ROUND: ${{ inputs.round }}
+  APPROVER: ${{ vars.PIPELINE_APPROVER || github.repository_owner }}
+  MAX_REVIEW_ROUNDS: ${{ vars.MAX_REVIEW_ROUNDS }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  BRANCH: idea/${{ inputs.issue }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Load pipeline
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.DEFAULT_BRANCH }}
+          path: _pipeline
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Prepare context
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./_pipeline/.github/scripts/pipeline.js').prepareContext({ github, context });
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: ${{ hashFiles('package-lock.json') != '' && 'npm' || '' }}
+
+      - name: Install
+        run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Implement
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: "*"
+          prompt: |
+            Follow the instructions in _pipeline/.github/prompts/build.md.
+          claude_args: >-
+            --max-turns 150
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(bash _pipeline/.github/scripts/verify.sh:*),Bash(git status:*),Bash(git diff:*),Bash(ls:*),Bash(mkdir:*)"
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+
+      - name: Commit and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bash _pipeline/.github/scripts/commit.sh "build: #${ISSUE} round ${ROUND}"
+
+      - name: Verify
+        id: verify
+        continue-on-error: true
+        run: bash _pipeline/.github/scripts/verify.sh .pipeline/out/checks.md
+
+      # A fresh session that didn't write the code reviews it.
+      - name: Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: "*"
+          prompt: |
+            Follow the instructions in _pipeline/.github/prompts/code-review.md.
+          claude_args: >-
+            --max-turns 50
+            --allowedTools "Read,Glob,Grep,Write,Bash(git diff:*),Bash(git log:*)"
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+
+      - name: Decide
+        uses: actions/github-script@v8
+        env:
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+        with:
+          script: |
+            await require('./_pipeline/.github/scripts/pipeline.js').finishBuild({ github, context });
+
+      - name: Report failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const p = fs.existsSync('./_pipeline/.github/scripts/pipeline.js') ? './_pipeline/.github/scripts/pipeline.js' : './.github/scripts/pipeline.js';
+            await require(p).failStage({ github, context, stage: 'build' });

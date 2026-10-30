@@ -1,0 +1,64 @@
+name: "Stage: idea review"
+run-name: "review #${{ inputs.issue }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue: { description: Issue number, required: true, type: string }
+      feedback_comment_id: { description: Comment holding feedback, required: false, type: string, default: "" }
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: pipeline-${{ inputs.issue }}
+  cancel-in-progress: false
+
+env:
+  ISSUE: ${{ inputs.issue }}
+  FEEDBACK_ID: ${{ inputs.feedback_comment_id }}
+  APPROVER: ${{ vars.PIPELINE_APPROVER || github.repository_owner }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Prepare context
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./.github/scripts/pipeline.js').prepareContext({ github, context });
+
+      - name: Adversarial review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Stage runs are dispatched by github-actions[bot]; only repo writers can dispatch.
+          allowed_bots: "*"
+          prompt: |
+            Follow the instructions in .github/prompts/review.md.
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Write,Task"
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+
+      - name: Post prompt
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./.github/scripts/pipeline.js').finishReview({ github, context });
+
+      - name: Report failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await require('./.github/scripts/pipeline.js').failStage({ github, context, stage: 'review' });

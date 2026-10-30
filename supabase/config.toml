@@ -1,0 +1,4 @@
+# Minimal config for linking and pushing migrations to hosted projects.
+# For the local Docker stack (phase 2), run `supabase init --force` to
+# generate the full file, then keep it committed.
+project_id = "app"
