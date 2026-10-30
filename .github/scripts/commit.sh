@@ -22,7 +22,9 @@ for p in .github .claude CLAUDE.md; do
 done
 if [ -n "$reverted" ]; then echo "$reverted" > .pipeline/out/reverted.txt; else rm -f .pipeline/out/reverted.txt; fi
 
-git add -A -- . ':(exclude)_pipeline' ':(exclude).pipeline'
+# .pipeline/ and _pipeline/ are excluded via .gitignore. Naming them in
+# pathspecs makes git add fail because they're ignored.
+git add -A
 if git diff --cached --quiet; then
   echo "Nothing to commit."
 else
