@@ -85,6 +85,12 @@ jobs:
   # Optional: your APPROVED comment also approves the environment gate, so you
   # only act once. Needs the APPROVER_PAT secret; without it, tap Approve in
   # the GitHub app when it asks.
+  #
+  # Security tradeoff: the required-reviewer gate is meant to be a second,
+  # independent check (a live GitHub session) before code reaches production.
+  # Setting APPROVER_PAT collapses that into your issue comment alone. Only
+  # set this secret if a single APPROVED comment is an acceptable bar for
+  # shipping to production; otherwise leave it unset.
   auto-approve:
     needs: merge
     if: ${{ needs.merge.result == 'success' }}

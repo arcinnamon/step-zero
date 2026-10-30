@@ -67,6 +67,7 @@ Without these, the migration steps are skipped and say so in the prompt.
 
 - In the `production` environment, add yourself under Required reviewers. GitHub then asks you to approve each production deploy, with an Approve button in the mobile app.
 - Optional, to approve once instead of twice: create a fine-grained personal access token for this repo with Actions and Deployments read and write permissions, and save it as `APPROVER_PAT`. Your APPROVED comment then approves the gate for you.
+  - **Security tradeoff:** the required-reviewer gate exists as a second, independent check before code reaches production — normally it needs a live GitHub session, not just an issue comment. Setting `APPROVER_PAT` collapses that into one factor: your `APPROVED` comment alone ships to production, with no separate confirmation step. Only set this if you're comfortable treating the issue-comment approval as sufficient on its own; otherwise leave `APPROVER_PAT` unset and tap Approve by hand each time.
 
 **6. Lockfile**
 

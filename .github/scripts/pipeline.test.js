@@ -236,7 +236,7 @@ test('finishBuild: escalates to the owner after the max rounds, instead of retry
   assert.match(comment.body, /Reply APPROVED to deploy to staging anyway/);
 });
 
-test('finishBuild: does not advance to staging when an agent touched protected paths, even with passing checks', () => {
+test('finishBuild: does not advance to staging when an agent touched protected paths, even with passing checks', async () => {
   const prev = { stage: 'build', status: 'running', branch: 'idea/7', round: 1 };
   const { github, store } = fakeGithub({ comments: [stateComment(prev)] });
   const context = { repo: { owner: 'acme', repo: 'app' } };
@@ -246,16 +246,19 @@ test('finishBuild: does not advance to staging when an agent touched protected p
     'summary.md': 'Built the thing.',
     'reverted.txt': 'CLAUDE.md',
   });
-  return withEnv(
-    { ISSUE: '7', APPROVER: 'acme', DEFAULT_BRANCH: 'main', BRANCH: 'idea/7', ROUND: '1', VERIFY_OUTCOME: 'success', MAX_REVIEW_ROUNDS: '3' },
-    () => P.finishBuild({ github, context })
-  ).finally(() => {
+  try {
+    await withEnv(
+      { ISSUE: '7', APPROVER: 'acme', DEFAULT_BRANCH: 'main', BRANCH: 'idea/7', ROUND: '1', VERIFY_OUTCOME: 'success', MAX_REVIEW_ROUNDS: '3' },
+      () => P.finishBuild({ github, context })
+    );
+  } finally {
     clearOut();
-    assert.equal(store.dispatches.length, 1);
-    assert.equal(store.dispatches[0].workflow_id, P.WORKFLOW.build, 'retried, not promoted to staging');
-    const state = P.decodeState(store.comments[store.comments.length - 1].body);
-    assert.notEqual(state.stage, 'staging');
-  });
+  }
+
+  assert.equal(store.dispatches.length, 1);
+  assert.equal(store.dispatches[0].workflow_id, P.WORKFLOW.build, 'retried, not promoted to staging');
+  const state = P.decodeState(store.comments[store.comments.length - 1].body);
+  assert.notEqual(state.stage, 'staging');
 });
 
 // ---------- orchestrate(): only the approver's comments move the pipeline ----------
