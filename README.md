@@ -11,7 +11,7 @@ Stack: Next.js on Vercel, Supabase for the database and auth, Claude Code GitHub
 
 ## How you use it
 
-1. Open an issue with the **Idea** template. A few sentences is enough.
+1. Open an issue with the **Idea** template. A few sentences is enough, just enough to set up an MVP.
 2. The pipeline replies in the same issue when it needs you. Every prompt ends with what to do next.
 3. Reply with one of:
    - `APPROVED` to move to the next stage. It must be the whole comment.
