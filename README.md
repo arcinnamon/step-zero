@@ -9,6 +9,17 @@ Idea issue ─► Adversarial review ─► Plan ─► Build ⇄ Code review �
 
 Stack: Next.js on Vercel, Supabase for the database and auth, Claude Code GitHub Action for the agents.
 
+## Setup
+
+1. Create the repo from the step-zero template, then set the Actions permissions and run Pipeline setup to create labels.
+2. Add these repository secrets under Actions:
+  1. CLAUDE_CODE_OAUTH_TOKEN
+  2. VERCEL_TOKEN
+  3. VERCEL_ORG_ID
+  4. VERCEL_PROJECT_ID
+3. Create separate staging and production Supabase projects now, since this project needs a database from the first real idea.
+4. Add the production environment with yourself as required reviewer, and leave APPROVER_PAT unset given the admin-auth work coming.
+
 ## How you use it
 
 1. Open an issue with the **Idea** template. A few sentences is enough, just enough to set up an MVP.
