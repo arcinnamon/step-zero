@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-test("home page renders", async ({ page }) => {
+test("home page greets with Hola", async ({ page }) => {
   const response = await page.goto("/");
   expect(response?.ok()).toBeTruthy();
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const heading = page.getByRole("heading", { level: 1, name: "Hola" });
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveAttribute("lang", "es");
 });

@@ -20,8 +20,8 @@ None.
 
 ## Tasks
 
-- [ ] T1: In `app/page.tsx`, change the h1 to `<h1 lang="es">Hola</h1>`, leaving the paragraph unchanged. Verify: `npm run typecheck` and `npm run lint` pass.
-- [ ] T2: Update `tests/e2e/home.spec.ts` to assert `getByRole("heading", { level: 1, name: "Hola" })` is visible and has attribute `lang="es"`. Verify: `npm run test:e2e` passes, and fails if the h1 text is reverted.
+- [x] T1: In `app/page.tsx`, change the h1 to `<h1 lang="es">Hola</h1>`, leaving the paragraph unchanged. Verify: `npm run typecheck` and `npm run lint` pass.
+- [x] T2: Update `tests/e2e/home.spec.ts` to assert `getByRole("heading", { level: 1, name: "Hola" })` is visible and has attribute `lang="es"`. Verify: `npm run test:e2e` passes, and fails if the h1 text is reverted.
 
 ## Risks
 
