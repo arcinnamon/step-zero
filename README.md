@@ -69,11 +69,51 @@ Run `claude setup-token` locally and save the token as the repository secret `CL
 
 **4. Supabase (optional until an idea needs a database)**
 
-- Create two projects: staging and production.
-- Repository secret: `SUPABASE_ACCESS_TOKEN` (from your Supabase account settings).
-- Settings → Environments: create `staging` and `production`. In each, add `SUPABASE_PROJECT_REF` and `SUPABASE_DB_PASSWORD` for that project.
+Once this is set up, migrations need no extra action from you. The staging stage runs `supabase db push` against staging before e2e tests. The production stage runs it against production before the new code deploys. Until it's set up, both steps are skipped, and the staging prompt says `Database: skipped (Supabase not set up)`.
 
-Without these, the migration steps are skipped and say so in the prompt.
+*Create the projects.* Create two projects, `<name>_staging` and `<name>_production`. For each:
+
+- Region: East US (N. Virginia), next to Vercel's default function region (`iad1`). Use the same region for both.
+- Database password: generate one and save it straight away. CI needs it, and Supabase won't show it again.
+- Data API: leave it on. If offered, leave "automatically expose new tables" on too. Otherwise tables created by migrations aren't reachable from `supabase-js` without extra `GRANT`s. Every table has RLS, so this is safe.
+- Note the project ref (from the dashboard URL, `supabase.com/dashboard/project/<ref>`), the project URL (`https://<ref>.supabase.co`), and the publishable key (Project Settings → API Keys, `sb_publishable_...`). Nothing here needs the secret key.
+
+*GitHub.*
+
+- Supabase → Account → Access Tokens: create a token and save it as the repository secret `SUPABASE_ACCESS_TOKEN`. One token covers both projects.
+- Settings → Environments: create `staging` and `production`. In each, add these as environment **secrets** (not variables):
+
+  | Secret | `staging` | `production` |
+  |---|---|---|
+  | `SUPABASE_PROJECT_REF` | staging ref | production ref |
+  | `SUPABASE_DB_PASSWORD` | staging password | production password |
+
+*Vercel.* Under Project → Settings → Environment Variables:
+
+| Variable | Preview | Production |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | staging URL | production URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | staging key | production key |
+
+Add both as type **Config**, not Secret. They're built into the browser bundle anyway: the publishable key is meant to be public, and RLS protects the data. You can ignore Vercel's warning about them.
+
+For local development, copy `.env.example` to `.env.local` and fill in the staging values.
+
+*Check it.*
+
+- Actions → **Stage: production** → Run workflow, with the issue left blank. This redeploys the default branch and pushes migrations to production. With no migrations yet, it logs "Remote database is up to date". A failure here means a wrong ref, password, or token.
+- The first idea that reaches staging should report `Database: migrations applied to staging`.
+
+*When you add login.* In each project, go to Authentication → URL Configuration. For staging, add `https://*-<vercel-team>.vercel.app/**` to the redirect URLs so previews can sign in. For production, set the Site URL to your production domain. `app/auth/callback` needs both.
+
+*Resetting staging.* Staging gets migrations from `idea/<n>` branches before they're merged. If a migration changes after staging ran it, or an idea is abandoned, staging drifts from the default branch, and later pushes fail or skip the changed file. Staging data is disposable, so reset it from an up-to-date default-branch checkout:
+
+```
+npx supabase link --project-ref <staging-ref>
+npx supabase db reset --linked
+```
+
+This wipes the staging database and replays the local migrations. Never run it against production.
 
 **5. Production approval gate**
 
